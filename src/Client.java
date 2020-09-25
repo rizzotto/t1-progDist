@@ -3,9 +3,9 @@ import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.server.UnicastRemoteObject;
+import java.util.Random;
 
 public class Client extends UnicastRemoteObject implements ClientInterface {
-    public static ClientThread thread = null;
     public static boolean inicia = false;
     public static boolean finalizouClient = false;
 
@@ -54,7 +54,6 @@ public class Client extends UnicastRemoteObject implements ClientInterface {
         }
 
         while (true) {
-
             try {
                 int i = 0;
                 if(id == -1){
@@ -65,11 +64,12 @@ public class Client extends UnicastRemoteObject implements ClientInterface {
                     while ( i < 20){
                         if(!finalizouClient){
                             server.joga(id);
-                            Thread.sleep(500);
+                            Thread.sleep(randomTime());
                             i++;
                         }
                     }
                     server.encerra(id);
+                    System.out.println("Jogo Finalizado");
                     return;
                 }
             } catch (RemoteException e) {
@@ -96,5 +96,12 @@ public class Client extends UnicastRemoteObject implements ClientInterface {
     }
     public void cutuca() {
         System.out.println("Jogador cutucado");
+    }
+
+    public static int randomTime(){
+        Random r = new Random();
+        int low = 500;
+        int high = 1500;
+        return r.nextInt(high-low) + low;
     }
 }

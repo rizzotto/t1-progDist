@@ -1,5 +1,7 @@
 
+import java.net.MalformedURLException;
 import java.rmi.Naming;
+import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.rmi.registry.LocateRegistry;
@@ -11,17 +13,9 @@ import java.util.concurrent.TimeUnit;
 public class Server extends UnicastRemoteObject implements ServerInterface {
     private static volatile int registrou;
     private static volatile boolean changed;
-    private static volatile boolean jogadaChamada;
-    private static volatile boolean jogadorFinalizado;
     private static volatile String remoteHostName;
-    private static volatile Integer actualPort;
     private static Random random = new Random();
-    private static volatile List<Integer> listaUsuarios = new ArrayList<>();
-    private static volatile List<Integer> remoteHostPort = new ArrayList<>();
-    private static volatile List<String> remoteHostConnection = new ArrayList<>();
-    private static volatile List<ClientInterface> serversLookup = new ArrayList<>();
-
-
+    private static volatile HashMap<Integer, String> hashConnections = new HashMap<>();
 
 
     public Server() throws RemoteException {
@@ -50,89 +44,53 @@ public class Server extends UnicastRemoteObject implements ServerInterface {
         }
 
         while (true) {
-            if (changed || jogadaChamada) {
+            if (changed) {
 
-
-                try {
-                    for(int i = 0; i < remoteHostConnection.size(); i++){
-                        ClientInterface server = (ClientInterface) Naming.lookup(remoteHostConnection.get(i));
-                        serversLookup.add(server);
-//                        System.out.println("Calling client back at : " + remoteHostConnection.get(i));
-                    }
-
-
-                } catch (Exception e) {
-                    System.out.println ("Callback failed: ");
-                    e.printStackTrace();
-                }
-
-                try {
-                    int jogadores = Integer.parseInt(args[1]);
-                    if(registrou == jogadores){
-                        if(listaUsuarios.size() == jogadores && changed ){
-                            for(int i=0; i < jogadores; i++){
-                                for(int j = 0; j < serversLookup.size(); j++){
-                                    serversLookup.get(j).inicia(listaUsuarios.get(i));
-                                }
+                int jogadores = Integer.parseInt(args[1]);
+                if (registrou == jogadores && changed) {
+                        hashConnections.forEach((i,j) -> {
+                            ClientInterface server = null;
+                            try {
+                                server = (ClientInterface) Naming.lookup(j);
+                                server.inicia(i);
+                            } catch (Exception e) {
+                                e.printStackTrace();
                             }
-                        }
-                    }
 
-                    if(jogadaChamada){
-                        jogadaChamada = false;
-                        var r = Math.random();
-                        if(r < 0.01){
-                                int i = remoteHostPort.indexOf(actualPort);
-                                serversLookup.get(i).finaliza();
-                                return;
-                        }
-                    }
-
-                    //cutucada
-//                    Thread t = new Thread(new Runnable() {
-//                        @Override
-//                        public void run() {
-//                            try {
-//                                for(int j = 0; j < serversLookup.size(); j++){
-//                                    serversLookup.get(j).cutuca();
-//                                }
-//                            } catch (RemoteException e) {
-//                                e.printStackTrace();
-//                            }
-//                        }
-//                    });
-//
-//                    try {
-//                        t.sleep(3000);
-//                        t.start();
-//                    } catch (InterruptedException e) {
-//                        e.printStackTrace();
-//                    }
-
-                } catch (RemoteException e) {
-                    e.printStackTrace();
+                        });
                 }
+
                 changed = false;
             }
             try {
-                Thread.sleep(100);
-            } catch (InterruptedException ex) {}
+                hashConnections.forEach((i,j) -> {
+                    ClientInterface server = null;
+                    try {
+                        server = (ClientInterface) Naming.lookup(j);
+                        server.cutuca();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
+                });
+
+
+                Thread.sleep(3000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
     }
 
 
-
     public int registra(int port) {
         int numero = random.nextInt();
-        listaUsuarios.add(numero);
         registrou++;
         try {
             remoteHostName = getClientHost();
-            actualPort = port;
-            remoteHostPort.add(port);
-            remoteHostConnection.add("rmi://" + remoteHostName + ":" + port + "/server2");
+            hashConnections.put(numero, "rmi://" + remoteHostName + ":" + port + "/server2");
         } catch (Exception e) {
-            System.out.println ("Failed to get client IP");
+            System.out.println("Failed to get client IP");
             e.printStackTrace();
         }
         changed = true;
@@ -140,21 +98,27 @@ public class Server extends UnicastRemoteObject implements ServerInterface {
     }
 
     public int joga(int id) {
-        System.out.println("Jogador: " + id + " acabou de realizar uma jogada");
-        jogadaChamada = true;
+        try{
+            System.out.println("Jogador: " + id + " acabou de realizar uma jogada");
+
+            var r = Math.random();
+
+            if (r < 0.01) {
+                ClientInterface server = (ClientInterface) Naming.lookup(hashConnections.remove(id));
+                server.finaliza();
+            }
+        }catch (Exception e){
+            System.out.println(e);
+        }
 
         return 1;
+        }
+
+        public int encerra ( int id){
+            hashConnections.remove(id);
+            System.out.println("Jogador: " + id + " removido");
+
+            return 2;
+        }
+
     }
-
-    public int encerra(int id) {
-
-//        for (int i = 0; i < listaUsuarios.size(); i++) {
-//            if (id == listaUsuarios.get(i))
-//                listaUsuarios.remove(id);
-                System.out.println("Jogador: " + id + " removido");
-//        }
-
-        return 2;
-    }
-
-}
