@@ -8,14 +8,20 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 
-public class Server extends UnicastRemoteObject implements JogoInterface {
+public class Server extends UnicastRemoteObject implements ServerInterface {
     private static volatile int registrou;
     private static volatile boolean changed;
     private static volatile boolean jogadaChamada;
     private static volatile boolean jogadorFinalizado;
     private static volatile String remoteHostName;
+    private static volatile Integer actualPort;
     private static Random random = new Random();
     private static volatile List<Integer> listaUsuarios = new ArrayList<>();
+    private static volatile List<Integer> remoteHostPort = new ArrayList<>();
+    private static volatile List<String> remoteHostConnection = new ArrayList<>();
+    private static volatile List<ClientInterface> serversLookup = new ArrayList<>();
+
+
 
 
     public Server() throws RemoteException {
@@ -29,14 +35,14 @@ public class Server extends UnicastRemoteObject implements JogoInterface {
 
         try {
             System.setProperty("java.rmi.server.hostname", args[0]);
-            LocateRegistry.createRegistry(1099);
+            LocateRegistry.createRegistry(52369);
             System.out.println("java RMI registry created.");
         } catch (RemoteException e) {
             System.out.println("java RMI registry already exists.");
         }
 
         try {
-            String server = "//" + args[0] + "/server";
+            String server = "rmi://" + args[0] + ":52369/server";
             Naming.rebind(server, new Server());
             System.out.println("Server is ready.");
         } catch (Exception e) {
@@ -46,12 +52,15 @@ public class Server extends UnicastRemoteObject implements JogoInterface {
         while (true) {
             if (changed || jogadaChamada) {
 
-                String connectLocation = "//" + remoteHostName + "/server2";
 
-                JogadorInterface server2 = null;
                 try {
-                    System.out.println("Calling client back at : " + connectLocation);
-                    server2 = (JogadorInterface) Naming.lookup(connectLocation);
+                    for(int i = 0; i < remoteHostConnection.size(); i++){
+                        ClientInterface server = (ClientInterface) Naming.lookup(remoteHostConnection.get(i));
+                        serversLookup.add(server);
+//                        System.out.println("Calling client back at : " + remoteHostConnection.get(i));
+                    }
+
+
                 } catch (Exception e) {
                     System.out.println ("Callback failed: ");
                     e.printStackTrace();
@@ -62,8 +71,9 @@ public class Server extends UnicastRemoteObject implements JogoInterface {
                     if(registrou == jogadores){
                         if(listaUsuarios.size() == jogadores && changed ){
                             for(int i=0; i < jogadores; i++){
-                                server2.inicia(listaUsuarios.get(i));
-
+                                for(int j = 0; j < serversLookup.size(); j++){
+                                    serversLookup.get(j).inicia(listaUsuarios.get(i));
+                                }
                             }
                         }
                     }
@@ -72,24 +82,26 @@ public class Server extends UnicastRemoteObject implements JogoInterface {
                         jogadaChamada = false;
                         var r = Math.random();
                         if(r < 0.01){
-                            server2.finaliza();
-
-                            return;
+                                int i = remoteHostPort.indexOf(actualPort);
+                                serversLookup.get(i).finaliza();
+                                return;
                         }
                     }
 
                     //cutucada
-//                    JogadorInterface finalServer = server2;
 //                    Thread t = new Thread(new Runnable() {
 //                        @Override
 //                        public void run() {
 //                            try {
-//                                finalServer.cutuca();
+//                                for(int j = 0; j < serversLookup.size(); j++){
+//                                    serversLookup.get(j).cutuca();
+//                                }
 //                            } catch (RemoteException e) {
 //                                e.printStackTrace();
 //                            }
 //                        }
 //                    });
+//
 //                    try {
 //                        t.sleep(3000);
 //                        t.start();
@@ -110,12 +122,15 @@ public class Server extends UnicastRemoteObject implements JogoInterface {
 
 
 
-    public int registra() {
+    public int registra(int port) {
         int numero = random.nextInt();
         listaUsuarios.add(numero);
         registrou++;
         try {
             remoteHostName = getClientHost();
+            actualPort = port;
+            remoteHostPort.add(port);
+            remoteHostConnection.add("rmi://" + remoteHostName + ":" + port + "/server2");
         } catch (Exception e) {
             System.out.println ("Failed to get client IP");
             e.printStackTrace();
