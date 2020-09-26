@@ -1,29 +1,21 @@
 
-import java.net.MalformedURLException;
 import java.rmi.Naming;
-import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.rmi.registry.LocateRegistry;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-
 
 public class Server extends UnicastRemoteObject implements ServerInterface {
-    private static volatile int registrou;
-    private static volatile boolean changed;
+    private static volatile int registred;
     private static volatile String remoteHostName;
-    private static Random random = new Random();
     private static volatile HashMap<Integer, String> hashConnections = new HashMap<>();
-
 
     public Server() throws RemoteException {
     }
 
     public static void main(String[] args) throws RemoteException {
         if (args.length != 2) {
-            System.out.println("Usage: java Server <server ip> <N>");
+            System.out.println("Usage: java Server <server ip> <number of players>");
             System.exit(1);
         }
 
@@ -44,36 +36,29 @@ public class Server extends UnicastRemoteObject implements ServerInterface {
         }
 
         while (true) {
-            if (changed) {
-
-                int jogadores = Integer.parseInt(args[1]);
-                if (registrou == jogadores && changed) {
-                        hashConnections.forEach((i,j) -> {
-                            ClientInterface server = null;
-                            try {
-                                server = (ClientInterface) Naming.lookup(j);
-                                server.inicia(i);
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                            }
-
-                        });
-                }
-
-                changed = false;
-            }
-            try {
-                hashConnections.forEach((i,j) -> {
-                    ClientInterface server = null;
+            if (registred == Integer.parseInt(args[1])) {
+                hashConnections.forEach((i, j) -> {
                     try {
-                        server = (ClientInterface) Naming.lookup(j);
-                        server.cutuca();
+                        ClientInterface server = (ClientInterface) Naming.lookup(j);
+                        server.inicia(i);
                     } catch (Exception e) {
+                        System.out.println("Player inicialization failed");
                         e.printStackTrace();
                     }
 
                 });
+            }
+            try {
+                hashConnections.forEach((i, j) -> {
+                    try {
+                        ClientInterface server = (ClientInterface) Naming.lookup(j);
+                        server.cutuca();
+                    } catch (Exception e) {
+                        System.out.println("Connection check failed");
+                        e.printStackTrace();
+                    }
 
+                });
 
                 Thread.sleep(3000);
             } catch (InterruptedException e) {
@@ -82,24 +67,21 @@ public class Server extends UnicastRemoteObject implements ServerInterface {
         }
     }
 
-
     public int registra(int port) {
-        int numero = random.nextInt();
-        registrou++;
         try {
             remoteHostName = getClientHost();
-            hashConnections.put(numero, "rmi://" + remoteHostName + ":" + port + "/server2");
+            hashConnections.put(registred, "rmi://" + remoteHostName + ":" + port + "/client");
         } catch (Exception e) {
-            System.out.println("Failed to get client IP");
+            System.out.println("Registration failed");
             e.printStackTrace();
         }
-        changed = true;
-        return numero;
+        registred++;
+        return registred - 1;
     }
 
     public int joga(int id) {
-        try{
-            System.out.println("Jogador: " + id + " acabou de realizar uma jogada");
+        try {
+            System.out.println("Gamer " + id + " has played");
 
             var r = Math.random();
 
@@ -107,18 +89,19 @@ public class Server extends UnicastRemoteObject implements ServerInterface {
                 ClientInterface server = (ClientInterface) Naming.lookup(hashConnections.remove(id));
                 server.finaliza();
             }
-        }catch (Exception e){
-            System.out.println(e);
+        } catch (Exception e) {
+            System.out.println("Play failed");
+            e.printStackTrace();
         }
 
         return 1;
-        }
-
-        public int encerra ( int id){
-            hashConnections.remove(id);
-            System.out.println("Jogador: " + id + " removido");
-
-            return 2;
-        }
-
     }
+
+    public int encerra(int id) {
+        hashConnections.remove(id);
+        System.out.println("Gamer " + id + " removed");
+
+        return 2;
+    }
+
+}

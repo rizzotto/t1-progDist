@@ -27,14 +27,10 @@ public class Client extends UnicastRemoteObject implements ClientInterface {
             System.out.println("java RMI registry already exists.");
         }
 
-//        thread = new ClientThread(args);
-//        thread.start();
-//        new ClientThread(args).start();
-
         int id = -1;
 
         try {
-            String client = "rmi://" + args[1] + ":" + args[2] + "/server2";
+            String client = "rmi://" + args[1] + ":" + args[2] + "/client";
             Naming.rebind(client, new Client());
             System.out.println("Addition Server is ready.");
         } catch (Exception e) {
@@ -49,27 +45,27 @@ public class Client extends UnicastRemoteObject implements ClientInterface {
             System.out.println("Connecting to server at : " + connectLocation);
             server = (ServerInterface) Naming.lookup(connectLocation);
         } catch (Exception e) {
-            System.out.println ("Client failed: ");
+            System.out.println("Client failed: ");
             e.printStackTrace();
         }
 
         while (true) {
             try {
                 int i = 0;
-                if(id == -1){
+                if (id == -1) {
                     id = server.registra(Integer.parseInt(args[2]));
 
                 }
-                if(inicia){
-                    while ( i < 20){
-                        if(!finalizouClient){
+                if (inicia) {
+                    while (i < 20) {
+                        if (!finalizouClient) {
                             server.joga(id);
                             Thread.sleep(randomTime());
                             i++;
                         }
                     }
                     server.encerra(id);
-                    System.out.println("Jogo Finalizado");
+                    System.out.println("Game Over");
                     return;
                 }
             } catch (RemoteException e) {
@@ -79,29 +75,30 @@ public class Client extends UnicastRemoteObject implements ClientInterface {
             }
             try {
                 Thread.sleep(100);
-            } catch (InterruptedException ex) {}
+            } catch (InterruptedException ex) {
+            }
         }
 
     }
 
     public void inicia(int id) {
-        System.out.println("Jogador: " + id + " iniciado");
-//        thread.updateInicia(true);
+        System.out.println("Gamer " + id + " inicialized");
         inicia = true;
     }
+
     public void finaliza() {
-        System.out.println("Servidor encerrou 1% de chance");
-//        thread.updateFinalizou(true);
+        System.out.println("Server stopped (1% chance)");
         finalizouClient = true;
     }
+
     public void cutuca() {
-        System.out.println("Jogador cutucado");
+        System.out.println("Connection check");
     }
 
-    public static int randomTime(){
+    public static int randomTime() {
         Random r = new Random();
         int low = 500;
         int high = 1500;
-        return r.nextInt(high-low) + low;
+        return r.nextInt(high - low) + low;
     }
 }
